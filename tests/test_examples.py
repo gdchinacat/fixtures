@@ -89,14 +89,14 @@ class ExampleTest(unittest.TestCase):
     @fixture(
         Department,
         "Accounting",
-        manager=fixture.kwargs["alice"],  # type: ignore
+        manager=fixture.kwargs["alice"],
         fixture_name="accounting",
     )
     @fixture(
         Employee,
         "Bob C Paine",
         "Accountant",
-        department=fixture.kwargs["accounting"],  # type: ignore
+        department=fixture.kwargs["accounting"],
         fixture_name="bob",
     )
     def test_single_employee_company(

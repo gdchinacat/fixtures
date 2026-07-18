@@ -116,7 +116,7 @@ def test_stacked_fixtures_receive_previous_fixtures() -> None:
 
 def test_factory_kwarg_substitution() -> None:
     @fixture(Fixture, fixture_name="f1")
-    @fixture(Fixture, fixture=fixture.kwargs["f1"])  # type: ignore
+    @fixture(Fixture, fixture=fixture.kwargs["f1"])
     def func(
         fixture: NoArgFixture, f1: NoArgFixture
     ) -> tuple[NoArgFixture, NoArgFixture]:
