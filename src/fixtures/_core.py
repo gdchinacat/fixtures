@@ -71,16 +71,19 @@ class _KwargSubstitution:
         }
 
 
-def fixture[**P, R](
-    factory: Factory[P, R],
-    *fixture_args: object,
-    fixture_name: str | None = None,
-    **fixture_kwargs: object,
-) -> Callable[[Function[P, R]], Function[P, R]]:
+# Type annotations are intentionally missing since python type annotations do
+# not support adding kwargs and it is not possible to properly type this
+# functionality.
+def fixture(  # type: ignore[no-untyped-def]
+    factory,
+    *fixture_args,
+    fixture_name=None,
+    **fixture_kwargs,
+):
 
-    def decorator(func: Function[P, R]) -> Function[P, R]:
+    def decorator(func):  # type: ignore[no-untyped-def]
         @wraps(func)
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        def wrapper(*args, **kwargs):  # type: ignore[no-untyped-def]
             substituted_fixture_kwargs = _KwargSubstitution._substitute_kwargs(
                 fixture_kwargs, kwargs
             )
@@ -91,9 +94,9 @@ def fixture[**P, R](
             # that should be available to the fixture function so fixtures
             # can be stacked.
             _fixture = factory(
-                *fixture_args,  # type: ignore[arg-type]
+                *fixture_args,
                 **kwargs,
-                **substituted_fixture_kwargs,  # type: ignore[arg-type]
+                **substituted_fixture_kwargs,
             )
 
             name = fixture_name or get_default_fixture_name(factory)

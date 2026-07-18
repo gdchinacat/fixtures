@@ -1,3 +1,11 @@
+# Python type annotations do not allow specifying that a decorator adds keyword
+# arguments when calling a wrapped function. Unfortunately, this is exactly how
+# @fixture works. It is untyped because there is no way to properly type it.
+# Disable mypy errors that are caused by this inability to properly type it.
+# mypy: disable-error-code=no-untyped-call
+#     @fixture is untyped
+# mypy: disable-error-code=untyped-decorator
+#     Untyped decorator makes function "..." untyped  [untyped-decorator]
 """
 The test cases are very abstract and concise and do not do a good job at
 illustrating "real-world" use. This test module contains a contrived domain
@@ -8,12 +16,13 @@ sense to readers.
 import unittest
 import pydantic
 import dataclasses
+import typing
 
 from fixtures import fixture
 
 config = pydantic.ConfigDict(extra="allow")
 
-_LIST_FIELD = dataclasses.field(default_factory=list)
+_LIST_FIELD = dataclasses.field(default_factory=list[typing.Any])
 
 
 ###
@@ -54,7 +63,7 @@ class Department(_Named):
     manager: Employee
     """the employee who manages this department"""
 
-    employees: set["Employee"] = _LIST_FIELD
+    employees: list["Employee"] = _LIST_FIELD
     """the employees that belong to this department"""
 
     def __post_init__(self) -> None:
@@ -69,7 +78,7 @@ class Company(_Named):
     ceo: Employee
     """the chief executive officer of the company"""
 
-    departments: set[Department] = _LIST_FIELD
+    departments: list[Department] = _LIST_FIELD
     """the departments that make up the company"""
 
 
@@ -80,14 +89,14 @@ class ExampleTest(unittest.TestCase):
     @fixture(
         Department,
         "Accounting",
-        manager=fixture.kwargs["alice"],
+        manager=fixture.kwargs["alice"],  # type: ignore
         fixture_name="accounting",
     )
     @fixture(
         Employee,
         "Bob C Paine",
         "Accountant",
-        department=fixture.kwargs["accounting"],
+        department=fixture.kwargs["accounting"],  # type: ignore
         fixture_name="bob",
     )
     def test_single_employee_company(
@@ -97,7 +106,7 @@ class ExampleTest(unittest.TestCase):
         accounting: Department,
         alice: Employee,
         bob: Employee,
-        **_,
+        **_: typing.Any,
     ) -> None:
         assert ceo == company.ceo
         assert [] == company.departments
