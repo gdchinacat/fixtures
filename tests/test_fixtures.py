@@ -1,5 +1,6 @@
 import pytest
 from fixtures import default_fixture_name, get_default_fixture_name, fixture
+from typing import Any
 
 
 def test_get_default_fixture_name_unset() -> None:
@@ -62,3 +63,50 @@ def test_fixture_name_used() -> None:
         return named_fixture
 
     assert _fixture is func()
+
+
+class Fixture:
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        self.args = args
+        self.kwargs = kwargs
+
+
+def test_factory_args_kwargs() -> None:
+    args = ("arg1", "arg2")
+    kwargs = {"kwarg1": "kwarg1", "kwarg2": "kwarg2"}
+
+    @fixture(Fixture, *args, **kwargs)
+    def func(fixture: Fixture) -> tuple[object, object]:
+        return fixture.args, fixture.kwargs
+
+    assert (args, kwargs) == func()
+
+
+def test_fixture_decorated_method_args() -> None:
+    """test that self is handled properly"""
+
+    class TestCase:
+        @fixture(Fixture, "arg1")
+        def test(self, fixture) -> None:
+            return fixture.args[0]
+
+    assert "arg1" == TestCase().test()
+
+
+def test_stacked_fixtures_receive_previous_fixtures() -> None:
+    @fixture(Fixture, fixture_name="fixture1")
+    @fixture(Fixture, fixture_name="fixture2")
+    def func(fixture2: Fixture, **_: Any) -> Fixture:
+        return fixture2
+
+    assert "fixture1" in func().kwargs
+
+
+def test_factory_kwarg_substitution() -> None:
+    @fixture(Fixture, fixture_name="f1")
+    @fixture(Fixture, fixture=fixture.kwargs["f1"])
+    def func(fixture: Fixture, f1: Fixture) -> tuple[Fixture, Fixture]:
+        return (fixture, f1)
+
+    _fixture, f1 = func()
+    assert {"fixture": f1, "f1": f1} == _fixture.kwargs
