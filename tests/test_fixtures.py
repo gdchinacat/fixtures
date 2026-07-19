@@ -108,7 +108,9 @@ def test_fixture_decorated_method_args() -> None:
 def test_stacked_fixtures_receive_previous_fixtures() -> None:
     @fixture(Fixture, fixture_name="fixture1")
     @fixture(Fixture, fixture_name="fixture2")
-    def func(fixture2: Fixture[NoArgFixture], **_: Any) -> Fixture[NoArgFixture]:
+    def func(
+        fixture2: Fixture[NoArgFixture], **_: Any
+    ) -> Fixture[NoArgFixture]:
         return fixture2
 
     assert "fixture1" in func().kwargs

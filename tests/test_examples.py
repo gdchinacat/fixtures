@@ -85,7 +85,9 @@ class Company(_Named):
 class ExampleTest(unittest.TestCase):
     @fixture(Employee, "Chuck E Oliphant", "CEO", fixture_name="ceo")
     @fixture(Company, "Acme Co")
-    @fixture(Employee, "Alice C Conte", "Accounting Manager", fixture_name="alice")
+    @fixture(
+        Employee, "Alice C Conte", "Accounting Manager", fixture_name="alice"
+    )
     @fixture(
         Department,
         "Accounting",

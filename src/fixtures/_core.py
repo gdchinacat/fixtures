@@ -14,7 +14,9 @@ type Function[**P, R] = Callable[P, R]
 _DEFAULT_FIXTURE_NAME_ATTR = "__default_fixture_name"
 
 
-def default_fixture_name[**P, R](name: str) -> Callable[[Factory[P, R]], Factory[P, R]]:
+def default_fixture_name[**P, R](
+    name: str,
+) -> Callable[[Factory[P, R]], Factory[P, R]]:
     """
     Decorator to set the default fixture name for a factory.
 
@@ -40,7 +42,9 @@ def get_default_fixture_name[**P, R](factory: Factory[P, R]) -> str:
     provided. It is lower case so idiomatic class names become idiomatic
     argument named (ie foo is used for factory/class Foo).
     """
-    return getattr(factory, _DEFAULT_FIXTURE_NAME_ATTR, factory.__name__.lower())
+    return getattr(
+        factory, _DEFAULT_FIXTURE_NAME_ATTR, factory.__name__.lower()
+    )
 
 
 class _KwargSubstitution:
