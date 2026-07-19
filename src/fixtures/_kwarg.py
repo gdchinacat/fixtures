@@ -45,14 +45,20 @@ class _PartialFactory[**P, R]:
 
 
 @dataclass
-class _Decorator[**P, R]:
+class _Decorator[**P, R, **Prhs, Rrhs]:
     """
     Decorator that creates and injects a kwarg into an wrapped callable.
+    **P, R are the ParamSpec and return type for the decorated function.
+    **Prhs, Rrhs are for the right hand side.
     """
 
     kwarg: _Kwarg
-    rhs: DecoratorRHS[P, R]
+    rhs: DecoratorRHS[Prhs, Rrhs]
 
+    # __call__ should be -> Callable[[P.kwargs - {self.kwarg: Rrhs}], R] to
+    # indicate the kwarg is being injected (and the wrapper does not need it
+    # passed in), but that is not supported. Typing is best effort, but
+    # decorated functions will appear to require args/kwargs that they don't.
     def __call__(self, func: Callable[P, R]) -> Callable[P, R]:
         """
         Decorator is being applied, return the wrapper around the callable.
@@ -63,15 +69,18 @@ class _Decorator[**P, R]:
             """
             Decorated function is being called, resolve values.
             """
-            # Handle the RHS of '@ kwargs[...] << ...' by calling the factory,
-            # replacing the kwarg reference, or passing the value.
             match self.rhs:
                 case _PartialFactory():
+                    # call the partial factory with the call args
                     value = self.rhs(*args, **kwargs)
                 case _Kwarg():
+                    # lookup the kwarg
                     value = kwargs[self.rhs.name]
                 case _:
+                    # use the value as a literal
                     value = self.rhs
+
+            # Call the decorated function with the updated kwargs.
             kwargs[self.kwarg.name] = value
             return func(*args, **kwargs)
 
@@ -105,17 +114,23 @@ class _Kwarg:
         )
 
     @overload
-    def __lshift__[**P, R](self, factory: _Kwarg) -> _Decorator[P, R]: ...
+    def __lshift__[**P, R, **Prhs, Rrhs](
+        self, factory: _Kwarg
+    ) -> _Decorator[P, R, Prhs, Rrhs]: ...
 
     @overload
-    def __lshift__[**P, R](
-        self, factory: _PartialFactory[P, R]
-    ) -> _Decorator[P, R]: ...
+    def __lshift__[**P, R, **Prhs, Rrhs](
+        self, factory: _PartialFactory[Prhs, Rrhs]
+    ) -> _Decorator[P, R, Prhs, Rrhs]: ...
 
     @overload
-    def __lshift__[**P, R](self, factory: R) -> _Decorator[P, R]: ...
+    def __lshift__[**P, R, **Prhs, Rrhs](
+        self, factory: R
+    ) -> _Decorator[P, R, Prhs, Rrhs]: ...
 
-    def __lshift__[**P, R](self, rhs: DecoratorRHS[P, R]) -> _Decorator[P, R]:
+    def __lshift__[**P, R, **Prhs, Rrhs](
+        self, rhs: DecoratorRHS[P, R]
+    ) -> _Decorator[P, R, Prhs, Rrhs]:
         return _Decorator(self, rhs)
 
 

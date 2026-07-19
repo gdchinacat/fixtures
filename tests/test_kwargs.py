@@ -1,3 +1,4 @@
+
 import unittest
 from typing import Any
 
@@ -88,14 +89,6 @@ class KwargTest(unittest.TestCase):
             return value
 
         self.assertEqual(1, func())
-
-    def test_args_handling(self) -> None:
-        @kwargs.factory
-        @dataclass(config=ConfigDict(extra="allow"))
-        class Data:
-            a: int
-            b: str
-
 
 
 if __name__ == "__main__":
