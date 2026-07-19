@@ -1,4 +1,3 @@
-
 import unittest
 from typing import Any
 
@@ -89,6 +88,43 @@ class KwargTest(unittest.TestCase):
             return value
 
         self.assertEqual(1, func())
+
+
+@kwargs.factory
+@dataclass(config=ConfigDict(extra="allow"))
+class Data:
+    a: int
+    b: str
+
+
+class PartialFactoryTest(unittest.TestCase):
+    def test_factories_partials_with_kwargs(self) -> None:
+        @ kwargs["b"] << "b"
+        @ kwargs["data"] << Data(a=1)
+        def foo(data: Data, **_: Any) -> Data:
+            return data
+
+        data = foo()
+        self.assertEqual((1, "b"), (data.a, data.b))
+
+    def test_factories_partials_with_args(self) -> None:
+        @ kwargs["b"] << "b"
+        @ kwargs["data"] << Data(1)
+        def foo(data: Data, **_: Any) -> Data:
+            return data
+
+        data = foo()
+        self.assertEqual((1, "b"), (data.a, data.b))
+
+    def test_factories_get_kwargs(self) -> None:
+        @ kwargs["a"] << 1
+        @ kwargs["b"] << "b"
+        @ kwargs["data"] << Data()
+        def foo(data: Data, **_: Any) -> Data:
+            return data
+
+        data = foo()
+        self.assertEqual((1, "b"), (data.a, data.b))
 
 
 if __name__ == "__main__":
