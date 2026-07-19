@@ -7,6 +7,16 @@ the decorator as well as passed to the call.
 TODO - example
 """
 
+# TODO - disable all static type check ignores and document exactly whena and
+#        why they occur, what would be needed to add proper types. The concern
+#        with an untypable library is it encourages global or module type
+#        ignores which can then hide other ignores. Understanding exactly why
+#        they happen is important to know what features need to be added to
+#        typing or checkers or extensions, provide guidance to users on how to
+#        know one that they see is a limitation in the library/typing rather
+#        than an issue they should try to solve, and ensure there aren't proper
+#        fixes. Perhaps @overloads or cover methods, etc can mitigate the urge
+#        to add global/module ignores.
 # todo? - if callable is not a _Decorator.__call__.wrapper inspect the
 #         signature and only pass requested arguments if it doesn't take
 #         arbitrary argss. This will remove need for **_ on decorated functions
