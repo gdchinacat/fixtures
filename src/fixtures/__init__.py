@@ -17,4 +17,9 @@ keyword arguments.
 from . import _core
 from ._core import *
 
-__all__ = _core.__all__
+from . import _kwarg
+from ._kwarg import *
+
+__all__ = _core.__all__ + _kwarg.__all__
+
+del _core, _kwarg
