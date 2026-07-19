@@ -11,13 +11,14 @@ TODO - example
 #         signature and only pass requested arguments if it doesn't take
 #         arbitrary argss. This will remove need for **_ on decorated functions
 #         that don't want all of the intermediate kwargs.
+# todo? - deep call stacks since the decorators wrap, consider making stacked
+#         decorators append to a list on the initial to avoid deep call stacks.
 
 from typing import Any, Callable, overload
 from dataclasses import dataclass
 from functools import wraps
 
 __all__ = ("kwargs",)
-
 
 type DecoratorRHS[**P, R] = _Kwarg | _PartialFactory[P, R] | object
 """
@@ -63,28 +64,38 @@ class _Decorator[**P, R, **Prhs, Rrhs]:
         """
         Decorator is being applied, return the wrapper around the callable.
         """
+        return self._Wrapper(self, func)
 
-        @wraps(func)
-        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+    @dataclass
+    class _Wrapper[**_P, _R, **_Prhs, _Rrhs]:
+        """
+        Callable wrapper around the decorated function (or other _Wrapper).
+        Exists to enable wrappers to do isinstance() on callable to determine
+        if it is another wrapper.
+        """
+
+        decorator: _Decorator[_P, _R, _Prhs, _Rrhs]
+        func: Callable[_P, _R]
+
+        # @wraps(func)
+        def __call__(self, *args: _P.args, **kwargs: _P.kwargs) -> _R:
             """
             Decorated function is being called, resolve values.
             """
-            match self.rhs:
+            match self.decorator.rhs:
                 case _PartialFactory():
                     # call the partial factory with the call args
-                    value = self.rhs(*args, **kwargs)
+                    value = self.decorator.rhs(*args, **kwargs)
                 case _Kwarg():
                     # lookup the kwarg
-                    value = kwargs[self.rhs.name]
+                    value = kwargs[self.decorator.rhs.name]
                 case _:
                     # use the value as a literal
-                    value = self.rhs
+                    value = self.decorator.rhs
 
             # Call the decorated function with the updated kwargs.
-            kwargs[self.kwarg.name] = value
-            return func(*args, **kwargs)
-
-        return wrapper
+            kwargs[self.decorator.kwarg.name] = value
+            return self.func(*args, **kwargs)
 
 
 @dataclass
