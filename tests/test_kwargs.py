@@ -1,14 +1,17 @@
 import unittest
+from typing import Any
 
 from fixtures import kwargs
+from pydantic import ConfigDict
+from pydantic.dataclasses import dataclass
 
 
 class KwargTest(unittest.TestCase):
 
-    def test_kwarg_subscript(self) -> None:
+    def test_kwarg_subscription(self) -> None:
 
         _kwarg = kwargs["kwarg"]
-        self.assertEqual("kwarg", _kwarg.kwarg)
+        self.assertEqual("kwarg", _kwarg.name)
 
     def test_kwarg_call_fails(self) -> None:
         """
@@ -18,7 +21,7 @@ class KwargTest(unittest.TestCase):
         with self.assertRaises(TypeError) as te:
 
             @kwargs["value"]
-            def func[T](value: T) -> None:
+            def func[T](value: Any) -> None:
                 assert False, "should never be called"
 
         print(str(te.exception))
@@ -31,7 +34,7 @@ class KwargTest(unittest.TestCase):
         """
 
         @ kwargs["value"] << 1
-        def func(value: int):
+        def func(value: int) -> int:
             return value
 
     def test_kwarg_decorator_injects_value(self) -> None:
@@ -61,6 +64,38 @@ class KwargTest(unittest.TestCase):
             return value
 
         self.assertEqual(1, func())
+
+    def test_factory_kwarg_replacement_no_factory(self) -> None:
+        @kwargs.factory
+        def factory(value: int) -> int:
+            return value
+
+        @ kwargs["foo"] << factory(1)
+        @ kwargs["value"] << kwargs["foo"]
+        def func(value: int, **_: Any) -> int:
+            return value
+
+        self.assertEqual(1, func())
+
+    def test_factory_kwarg_replacement_factory(self) -> None:
+        @kwargs.factory
+        def factory(value: int, **_: Any) -> int:
+            return value
+
+        @ kwargs["foo"] << factory(1)
+        @ kwargs["value"] << factory(value=kwargs["foo"])
+        def func(value: int, **_: Any) -> int:
+            return value
+
+        self.assertEqual(1, func())
+
+    def test_args_handling(self) -> None:
+        @kwargs.factory
+        @dataclass(config=ConfigDict(extra="allow"))
+        class Data:
+            a: int
+            b: str
+
 
 
 if __name__ == "__main__":
