@@ -1,5 +1,8 @@
+# mypy: disable-error-code=arg-type
+# mypy: disable-error-code=call-arg
+
 import unittest
-from typing import Any
+from typing import Any, assert_type
 
 from fixtures import kwargs
 from pydantic import ConfigDict
@@ -125,6 +128,46 @@ class PartialFactoryTest(unittest.TestCase):
 
         data = foo()
         self.assertEqual((1, "b"), (data.a, data.b))
+
+
+class DecoratorTypeTest(unittest.TestCase):
+    """
+    Test the type annotations for decorated functions that are inferred by type
+    checkers are correct.
+    """
+
+    def test_literal(self) -> None:
+        @ kwargs["_"] << ""
+        def foo(**_: Any) -> int:
+            return 1
+
+        _foo = foo()
+        self.assertEqual(1, _foo)
+        assert_type(_foo, int)
+
+    def test_kwarg(self) -> None:
+        @ kwargs["s"] << ""
+        @ kwargs["s2"] << kwargs["s"]
+        def foo(**_: Any) -> int:
+            return 1
+
+        _foo = foo()
+        self.assertEqual(1, _foo)
+        assert_type(_foo, int)
+
+    def test_factory(self) -> None:
+        @kwargs.factory
+        def factory() -> str:
+            return ""
+
+        @ kwargs["_"] << factory()
+        def foo(**_: Any) -> int:
+            return 1
+
+        _foo = foo()
+        self.assertEqual(1, _foo)
+
+        assert_type(_foo, int)
 
 
 if __name__ == "__main__":

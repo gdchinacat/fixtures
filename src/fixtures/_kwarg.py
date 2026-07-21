@@ -56,10 +56,41 @@ class _PartialFactory[**P, R]:
 
 
 @dataclass
-class _Decorator[**P, R, **Prhs, Rrhs]:
+class _Wrapper[**P, R, **Prhs, Rrhs]:
+    """
+    Callable wrapper around the decorated function (or other _Wrapper).
+    Exists to enable wrappers to do isinstance() on callable to determine
+    if it is another wrapper.
+    """
+
+    decorator: _Decorator[Prhs, Rrhs]
+    func: Callable[P, R]
+
+    # @wraps(func)
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
+        """
+        Decorated function is being called, resolve values.
+        """
+        match self.decorator.rhs:
+            case _PartialFactory():
+                # call the partial factory with the call args
+                value = self.decorator.rhs(*args, **kwargs)
+            case _Kwarg():
+                # lookup the kwarg
+                value = kwargs[self.decorator.rhs.name]
+            case _:
+                # use the value as a literal
+                value = self.decorator.rhs
+
+        # Call the decorated function with the updated kwargs.
+        kwargs[self.decorator.kwarg.name] = value
+        return self.func(*args, **kwargs)
+
+
+@dataclass
+class _Decorator[**Prhs, Rrhs]:
     """
     Decorator that creates and injects a kwarg into an wrapped callable.
-    **P, R are the ParamSpec and return type for the decorated function.
     **Prhs, Rrhs are for the right hand side.
     """
 
@@ -70,42 +101,11 @@ class _Decorator[**P, R, **Prhs, Rrhs]:
     # indicate the kwarg is being injected (and the wrapper does not need it
     # passed in), but that is not supported. Typing is best effort, but
     # decorated functions will appear to require args/kwargs that they don't.
-    def __call__(self, func: Callable[P, R]) -> Callable[P, R]:
+    def __call__[**P, R](self, func: Callable[P, R]) -> Callable[P, R]:
         """
         Decorator is being applied, return the wrapper around the callable.
         """
-        return self._Wrapper(self, func)
-
-    @dataclass
-    class _Wrapper[**_P, _R, **_Prhs, _Rrhs]:
-        """
-        Callable wrapper around the decorated function (or other _Wrapper).
-        Exists to enable wrappers to do isinstance() on callable to determine
-        if it is another wrapper.
-        """
-
-        decorator: _Decorator[_P, _R, _Prhs, _Rrhs]
-        func: Callable[_P, _R]
-
-        # @wraps(func)
-        def __call__(self, *args: _P.args, **kwargs: _P.kwargs) -> _R:
-            """
-            Decorated function is being called, resolve values.
-            """
-            match self.decorator.rhs:
-                case _PartialFactory():
-                    # call the partial factory with the call args
-                    value = self.decorator.rhs(*args, **kwargs)
-                case _Kwarg():
-                    # lookup the kwarg
-                    value = kwargs[self.decorator.rhs.name]
-                case _:
-                    # use the value as a literal
-                    value = self.decorator.rhs
-
-            # Call the decorated function with the updated kwargs.
-            kwargs[self.decorator.kwarg.name] = value
-            return self.func(*args, **kwargs)
+        return _Wrapper(self, func)
 
 
 @dataclass
@@ -135,23 +135,23 @@ class _Kwarg:
         )
 
     @overload
-    def __lshift__[**P, R, **Prhs, Rrhs](
+    def __lshift__[**Prhs, Rrhs](
         self, factory: _Kwarg
-    ) -> _Decorator[P, R, Prhs, Rrhs]: ...
+    ) -> _Decorator[Prhs, Rrhs]: ...
 
     @overload
-    def __lshift__[**P, R, **Prhs, Rrhs](
+    def __lshift__[**Prhs, Rrhs](
         self, factory: _PartialFactory[Prhs, Rrhs]
-    ) -> _Decorator[P, R, Prhs, Rrhs]: ...
+    ) -> _Decorator[Prhs, Rrhs]: ...
 
     @overload
-    def __lshift__[**P, R, **Prhs, Rrhs](
-        self, factory: R
-    ) -> _Decorator[P, R, Prhs, Rrhs]: ...
+    def __lshift__[**Prhs, Rrhs](
+        self, factory: Rrhs
+    ) -> _Decorator[Prhs, Rrhs]: ...
 
-    def __lshift__[**P, R, **Prhs, Rrhs](
-        self, rhs: DecoratorRHS[P, R]
-    ) -> _Decorator[P, R, Prhs, Rrhs]:
+    def __lshift__[**Prhs, Rrhs](
+        self, rhs: DecoratorRHS[Prhs, Rrhs]
+    ) -> _Decorator[Prhs, Rrhs]:
         return _Decorator(self, rhs)
 
 
