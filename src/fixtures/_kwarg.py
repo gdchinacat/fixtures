@@ -186,6 +186,44 @@ class _Kwargs:
         remaining arguments are supplied at the time the decorated function is
         called.
         TODO - example
+# TODO - this is really ugly:
+#    1) The datamodel must use non-factories for references between classes, so
+#       the classes can't themselves be decorated with @kwargs.factory.
+#    2) kwargs decorators must use factories
+#         it could be spelled:
+#            @ kwargs["origin"] << kwargs.factory(Point)(0, 0)
+#         but that seems worse and creates massive bloat unless they are
+#         interned.
+#    3) the factory looks like a Point, but isn't a point, so the decorated
+#       function will be typed differently:
+#       @ kwargs['origim'] << Point(1, 1)
+#       def test_origin(origin: model.Point): ...
+#
+#  In practice, how ugly is it, really? The models are likely to already be
+#  defined elsewhere (in the code being tested) so:
+#      Point = kwargs.factory(model.Point)
+#  would likely be the 'proper' way to do it, which is alright(?).
+#
+#  This wasn't an issue with original @fixture(...) because it didn't create
+#  partial factories, it just held the factory and kwargs.
+#    1) the partial factory is 'needed' to disambiguate factory from kwarg
+#       from literal. It could assume any callable is a factory, but that is
+#       implicit (and explicit is better).
+#    2) the '<<< Point(1)' syntax is more readable (IMO) than '(Point, 1)'.
+#
+#  If the factories explicitly supported currying by creating a curried object
+#  that was detectable in the same way _FactoryPartial is this could be
+#  improved, but I don't want to require datamodels be extended from things
+#  that are just for test code. The test code shouldn't be in production and
+#  testing with it and shipping without is a Bad Idea.
+#
+#  So, what to do?
+#    1) different syntax rather than isinstance?
+#        @ kwargs['foo'] == literal_value # or kwargs['bar']
+#        @ kwargs['foo'] << (Point, 1)
+#    2) ???
+#
+#  For now, targets must be factories...Yuck.
         """
 
         factory: Callable[P, R]
