@@ -66,7 +66,6 @@ class _Wrapper[**P, R, **Prhs, Rrhs]:
     decorator: _Decorator[Prhs, Rrhs]
     func: Callable[P, R]
 
-    # @wraps(func)
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
         """
         Decorated function is being called, resolve values.
@@ -105,7 +104,18 @@ class _Decorator[**Prhs, Rrhs]:
         """
         Decorator is being applied, return the wrapper around the callable.
         """
-        return _Wrapper(self, func)
+        # The wrapper can not be used directly because it won't invoke the
+        # bound method handling and self won't be injected if the decorated
+        # function is a method. Return a function that dispatches to the
+        # wrapper when called.
+        # todo? annotate the function with the wrapper?
+        wrapper = _Wrapper(self, func)
+
+        @wraps(func)
+        def _wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            return wrapper(*args, **kwargs)
+
+        return _wrapper
 
 
 @dataclass
