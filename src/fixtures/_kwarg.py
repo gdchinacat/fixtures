@@ -50,9 +50,10 @@ class _PartialFactory[**P, R]:
             k: kwargs[v.name] if isinstance(v, _Kwarg) else v
             for k, v in self.kwargs.items()
         }
-        return self.factory.factory(
-            *self.args, *args, **actual_kwargs, **kwargs  # type: ignore[arg-type]  # todo
-        )
+        # Do not pass args to the factory, it may contain self, is intended for
+        # the decorated function. kwargs must be passed to allow get kwargs
+        # from stacked decorators.
+        return self.factory.factory(*self.args, **actual_kwargs, **kwargs)  # type: ignore[arg-type]
 
 
 @dataclass

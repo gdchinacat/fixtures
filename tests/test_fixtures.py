@@ -1,8 +1,3 @@
-# Python type annotations do not allow specifying that a decorator adds keyword
-# arguments when calling a wrapped function. Unfortunately, this is exactly how
-# @fixture works. It is untyped because there is no way to properly type it.
-# Disable mypy errors that are caused by this inability to properly type it.
-
 import pytest
 from fixtures import kwargs
 from typing import Any

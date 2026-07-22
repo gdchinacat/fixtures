@@ -1,11 +1,7 @@
 # Python type annotations do not allow specifying that a decorator adds keyword
 # arguments when calling a wrapped function. Unfortunately, this is exactly how
-# @fixture works. It is untyped because there is no way to properly type it.
+# @ kwargs[ works. It is untyped because there is no way to properly type it.
 # Disable mypy errors that are caused by this inability to properly type it.
-# mypy: disable-error-code=no-untyped-call
-#     @fixture is untyped
-# mypy: disable-error-code=untyped-decorator
-#     Untyped decorator makes function "..." untyped  [untyped-decorator]
 """
 The test cases are very abstract and concise and do not do a good job at
 illustrating "real-world" use. This test module contains a contrived domain
@@ -18,7 +14,7 @@ import pydantic
 import dataclasses
 import typing
 
-from fixtures import fixture
+from fixtures import kwargs
 
 config = pydantic.ConfigDict(extra="allow")
 
@@ -82,26 +78,26 @@ class Company(_Named):
     """the departments that make up the company"""
 
 
+_Employee = kwargs.factory(Employee)
+_Company = kwargs.factory(Company)
+_Department = kwargs.factory(Department)
+
+
 class ExampleTest(unittest.TestCase):
-    @fixture(Employee, "Chuck E Oliphant", "CEO", fixture_name="ceo")
-    @fixture(Company, "Acme Co")
-    @fixture(
-        Employee, "Alice C Conte", "Accounting Manager", fixture_name="alice"
+    @ kwargs["ceo"] << _Employee("Chuck E Oliphant", "CEO")
+    def test_single_employee(self, ceo: Employee) -> None:
+        assert ceo.name == "Chuck E Oliphant"
+
+    @ kwargs["ceo"] << _Employee("Chuck E Oliphant", "CEO")
+    @ kwargs["company"] << _Company("Acme Co")
+    @ kwargs["alice"] << _Employee("Alice C Conte", "Accounting Manager")
+    @ kwargs["accounting"] << _Department(
+        "Accounting", manager=kwargs["alice"]
     )
-    @fixture(
-        Department,
-        "Accounting",
-        manager=fixture.kwargs["alice"],
-        fixture_name="accounting",
+    @ kwargs["bob"] << _Employee(
+        "Bob C Paine", "Accountant", department=kwargs["accounting"]
     )
-    @fixture(
-        Employee,
-        "Bob C Paine",
-        "Accountant",
-        department=fixture.kwargs["accounting"],
-        fixture_name="bob",
-    )
-    def test_single_employee_company(
+    def test_company(
         self,
         company: Company,
         ceo: Employee,
