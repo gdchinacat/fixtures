@@ -84,7 +84,36 @@ class _Wrapper[**P, R, **Prhs, Rrhs]:
 
         # Call the decorated function with the updated kwargs.
         kwargs[self.decorator.kwarg.name] = value
-        return self.func(*args, **kwargs)
+        ret = self.func(*args, **kwargs)
+        # todo - add a 'cleanup' mechanism as the stack unwinds
+        #    1) @kwargs.factory(cleanup=...) to indicate it needs cleanup?
+        #    2) this became an issue because kiln_controller cleanup uses the
+        #       test case and I don't think passing self is a good idea so
+        #       _PartialFactory.__call__ doesn't pass args to the factory. Self
+        #       is likely the only arg that would ever be passed, but why is
+        #       it so special? Just because the fixtures want something to
+        #       hang lifecycle events off of? Why not the call stack (or a
+        #       fixture stack if the call stack is ever optimized out)?
+        #       It is handy, but feels wrong. I never liked @pass_self but
+        #       its use grew and grew. Then in the stripped down version for
+        #       kiln_controller it always injected self, fixtures were pretty
+        #       well tied to the test case (self). But modern pytest usage does
+        #       not have self, there is no test case, so fixtures should not
+        #       be dependent on it.
+        #    3) Provide a KwargFactoryCleanup base class that needs to be mixed
+        #       with any factory object that wants cleanup as the stack is
+        #       unwound? "tag interfaces" aren't nearly as popular in python
+        #       a java. It feels wrong. Maybe if it implements a protocol such
+        #       as callable(getattr(ret, 'tearDown', None)) then call tearDown?
+        # For now, this is hacked in (and untested while I figure out the best
+        # way for it to work. python test cases have a tearDown() function that
+        # is called to clean them up, if the fixture has a tearDown() method
+        # call it.
+
+        tear_down = getattr(value, "tearDown", None)
+        if callable(tear_down):
+            tear_down()
+        return ret
 
 
 @dataclass
@@ -148,7 +177,7 @@ class _Kwarg:
     @overload
     def __lshift__[**Prhs, Rrhs](
         self, factory: _Kwarg
-    ) -> _Decorator[Prhs, Rrhs]: ...
+    ) -> _Decorator[Prhs, object]: ...
 
     @overload
     def __lshift__[**Prhs, Rrhs](
@@ -161,9 +190,9 @@ class _Kwarg:
     ) -> _Decorator[Prhs, Rrhs]: ...
 
     def __lshift__[**Prhs, Rrhs](
-        self, rhs: DecoratorRHS[Prhs, Rrhs]
+        self, factory: DecoratorRHS[Prhs, Rrhs]
     ) -> _Decorator[Prhs, Rrhs]:
-        return _Decorator(self, rhs)
+        return _Decorator(self, factory)
 
 
 class _Kwargs:
@@ -186,45 +215,46 @@ class _Kwargs:
         remaining arguments are supplied at the time the decorated function is
         called.
         TODO - example
-# TODO - this is really ugly:
-#    1) The datamodel must use non-factories for references between classes, so
-#       the classes can't themselves be decorated with @kwargs.factory.
-#    2) kwargs decorators must use factories
-#         it could be spelled:
-#            @ kwargs["origin"] << kwargs.factory(Point)(0, 0)
-#         but that seems worse and creates massive bloat unless they are
-#         interned.
-#    3) the factory looks like a Point, but isn't a point, so the decorated
-#       function will be typed differently:
-#       @ kwargs['origim'] << Point(1, 1)
-#       def test_origin(origin: model.Point): ...
-#
-#  In practice, how ugly is it, really? The models are likely to already be
-#  defined elsewhere (in the code being tested) so:
-#      Point = kwargs.factory(model.Point)
-#  would likely be the 'proper' way to do it, which is alright(?).
-#
-#  This wasn't an issue with original @fixture(...) because it didn't create
-#  partial factories, it just held the factory and kwargs.
-#    1) the partial factory is 'needed' to disambiguate factory from kwarg
-#       from literal. It could assume any callable is a factory, but that is
-#       implicit (and explicit is better).
-#    2) the '<<< Point(1)' syntax is more readable (IMO) than '(Point, 1)'.
-#
-#  If the factories explicitly supported currying by creating a curried object
-#  that was detectable in the same way _FactoryPartial is this could be
-#  improved, but I don't want to require datamodels be extended from things
-#  that are just for test code. The test code shouldn't be in production and
-#  testing with it and shipping without is a Bad Idea.
-#
-#  So, what to do?
-#    1) different syntax rather than isinstance?
-#        @ kwargs['foo'] == literal_value # or kwargs['bar']
-#        @ kwargs['foo'] << (Point, 1)
-#    2) ???
-#
-#  For now, targets must be factories...Yuck.
         """
+
+        # TODO - this is really ugly:
+        #    1) The datamodel must use non-factories for references between classes, so
+        #       the classes can't themselves be decorated with @kwargs.factory.
+        #    2) kwargs decorators must use factories
+        #         it could be spelled:
+        #            @ kwargs["origin"] << kwargs.factory(Point)(0, 0)
+        #         but that seems worse and creates massive bloat unless they are
+        #         interned.
+        #    3) the factory looks like a Point, but isn't a point, so the decorated
+        #       function will be typed differently:
+        #       @ kwargs['origim'] << Point(1, 1)
+        #       def test_origin(origin: model.Point): ...
+        #
+        #  In practice, how ugly is it, really? The models are likely to already be
+        #  defined elsewhere (in the code being tested) so:
+        #      Point = kwargs.factory(model.Point)
+        #  would likely be the 'proper' way to do it, which is alright(?).
+        #
+        #  This wasn't an issue with original @fixture(...) because it didn't create
+        #  partial factories, it just held the factory and kwargs.
+        #    1) the partial factory is 'needed' to disambiguate factory from kwarg
+        #       from literal. It could assume any callable is a factory, but that is
+        #       implicit (and explicit is better).
+        #    2) the '<<< Point(1)' syntax is more readable (IMO) than '(Point, 1)'.
+        #
+        #  If the factories explicitly supported currying by creating a curried object
+        #  that was detectable in the same way _FactoryPartial is this could be
+        #  improved, but I don't want to require datamodels be extended from things
+        #  that are just for test code. The test code shouldn't be in production and
+        #  testing with it and shipping without is a Bad Idea.
+        #
+        #  So, what to do?
+        #    1) different syntax rather than isinstance?
+        #        @ kwargs['foo'] == literal_value # or kwargs['bar']
+        #        @ kwargs['foo'] << (Point, 1)
+        #    2) ???
+        #
+        #  For now, targets must be factories...Yuck.
 
         factory: Callable[P, R]
 
