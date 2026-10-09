@@ -23,7 +23,8 @@ TODO - example
 #         that don't want all of the intermediate kwargs.
 # todo? - deep call stacks since the decorators wrap, consider making stacked
 #         decorators append to a list on the initial to avoid deep call stacks.
-from contextlib import AbstractContextManager
+from collections.abc import Iterable, Generator
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from functools import wraps
 import inspect
@@ -44,6 +45,21 @@ class _PartialFactory[**P, R]:
     factory: _Kwargs.factory[P, R]
     args: tuple[object, ...]
     kwargs: dict[str, object]
+
+    @property
+    def required_parameters(self) -> Iterable[inspect.Parameter]:
+        """
+        The parameters that must be provided by the caller.
+        This includes only the factory function parameters that are not
+        provided by the partial kwargs.
+        """
+        signature = inspect.signature(self.factory.factory)
+        for parameter in signature.parameters.values():
+            if (
+                parameter.kind != inspect.Parameter.VAR_KEYWORD
+                and parameter.name not in self.kwargs
+            ):
+                yield parameter
 
     def __call__(self, *args: object, **kwargs: object) -> R:
         """create the value for the kwarg"""
@@ -138,22 +154,87 @@ class _Decorator[**Prhs, Rrhs]:
         # todo? annotate the function with the wrapper?
         wrapper = _Wrapper(self, func)
 
+        @self._set_signature
         @wraps(func)
         def _wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             return wrapper(*args, **kwargs)
 
-        # remove the injected keyword from the signature
-        signature = inspect.signature(_wrapper)
+        return _wrapper
+
+    def _set_signature[**P, R](
+        self, wrapper: Callable[P, R]
+    ) -> Callable[P, R]:
+        """
+        Private decorator to put a __signature__ on the wrapper to reflect
+        reality (at runtime anyway).
+
+        The injected argument is removed from the signature parameters since
+        the wrapper adds it when calling the decorated function.
+        Fixture function parameters that aren't already in the parameter list
+        are added. This is so pytest will see that they are needed for the
+        call to the decorated function and satisfy them (hopefully) with pytest
+        fixtures.
+        This function exists primarily to allow interoperation with pytest
+        fixtures.
+        """
+        signature = inspect.signature(wrapper)
+
+        # Remove the injected argument from the parameters.
         parameters = [
             param
             for name, param in signature.parameters.items()
             if name != self.kwarg.name
         ]
-        setattr(
-            _wrapper, "__signature__", signature.replace(parameters=parameters)
-        )
 
-        return _wrapper
+        # Add any parameters the fixture func has that don't already exist.
+        # todo? adding the factory args to the signature is technically
+        # correct, they must be passed in to the wrapper for the
+        # factory to execute. However this introduces the problem that
+        # they are passed through to the decorated function which may
+        # not know anything about them...they are an implementation
+        # detail of the kwargs decorator stack that currently leaks
+        # into the decorated function as an unexpected # kwarg that
+        # needs to be accepted (**_). This could be managed by tracking
+        # that this parameter was added for this reason and removing it
+        # from kwargs once it has been used by the factory, but not
+        # today.
+        if isinstance(self.rhs, _PartialFactory):
+            with _out_var_keyword(parameters) as parameters:
+                for param in self.rhs.required_parameters:
+                    if not any(
+                        _param.name == param.name for _param in parameters
+                    ):
+                        parameters.append(param)
+
+        # Set the modified signature on the wrapper.
+        signature = signature.replace(parameters=parameters)
+        setattr(wrapper, "__signature__", signature)
+        return wrapper
+
+
+@contextmanager
+def _out_var_keyword(
+    parameters: list[inspect.Parameter],
+) -> Generator[list[inspect.Parameter]]:
+    """
+    Context manager to remove the last VAR_KEYWORD parameter and add it back.
+
+    Usage:
+        parameters = inspect.signature(func).parameters.values()
+        with out_var_keyword(parameters) as parameters:
+            ...
+            parameters.append(...)
+
+    """
+    var_keyword_param: inspect.Parameter | None = None
+    if parameters and parameters[-1].kind == inspect.Parameter.VAR_KEYWORD:
+        var_keyword_param = parameters[-1]
+        parameters = parameters[:-1]
+
+    yield parameters
+
+    if var_keyword_param:
+        parameters.append(var_keyword_param)
 
 
 @dataclass
