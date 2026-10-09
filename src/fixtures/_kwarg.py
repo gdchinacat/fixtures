@@ -23,10 +23,11 @@ TODO - example
 #         that don't want all of the intermediate kwargs.
 # todo? - deep call stacks since the decorators wrap, consider making stacked
 #         decorators append to a list on the initial to avoid deep call stacks.
-
-from typing import Any, Callable, overload
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from functools import wraps
+from typing import Any, Callable, overload, ContextManager
+import traceback
 
 __all__ = ("kwargs",)
 
@@ -82,38 +83,33 @@ class _Wrapper[**P, R, **Prhs, Rrhs]:
                 # use the value as a literal
                 value = self.decorator.rhs
 
+        context_manager: AbstractContextManager[R] | None = None
+        if isinstance(value, AbstractContextManager):
+            context_manager = value
+            value = context_manager.__enter__()
+
         # Call the decorated function with the updated kwargs.
         kwargs[self.decorator.kwarg.name] = value
-        ret = self.func(*args, **kwargs)
-        # todo - add a 'cleanup' mechanism as the stack unwinds
-        #    1) @kwargs.factory(cleanup=...) to indicate it needs cleanup?
-        #    2) this became an issue because kiln_controller cleanup uses the
-        #       test case and I don't think passing self is a good idea so
-        #       _PartialFactory.__call__ doesn't pass args to the factory. Self
-        #       is likely the only arg that would ever be passed, but why is
-        #       it so special? Just because the fixtures want something to
-        #       hang lifecycle events off of? Why not the call stack (or a
-        #       fixture stack if the call stack is ever optimized out)?
-        #       It is handy, but feels wrong. I never liked @pass_self but
-        #       its use grew and grew. Then in the stripped down version for
-        #       kiln_controller it always injected self, fixtures were pretty
-        #       well tied to the test case (self). But modern pytest usage does
-        #       not have self, there is no test case, so fixtures should not
-        #       be dependent on it.
-        #    3) Provide a KwargFactoryCleanup base class that needs to be mixed
-        #       with any factory object that wants cleanup as the stack is
-        #       unwound? "tag interfaces" aren't nearly as popular in python
-        #       a java. It feels wrong. Maybe if it implements a protocol such
-        #       as callable(getattr(ret, 'tearDown', None)) then call tearDown?
-        # For now, this is hacked in (and untested while I figure out the best
-        # way for it to work. python test cases have a tearDown() function that
-        # is called to clean them up, if the fixture has a tearDown() method
-        # call it.
 
-        tear_down = getattr(value, "tearDown", None)
-        if callable(tear_down):
-            tear_down()
-        return ret
+        ret: R | None = None
+        try:
+            ret = self.func(*args, **kwargs)
+        except Exception as exc:
+            if context_manager:
+                if not context_manager.__exit__(
+                    type(exc), exc, exc.__traceback__
+                ):
+                    raise
+            else:
+                raise
+        else:
+            if context_manager:
+                context_manager.__exit__(None, None, None)
+
+        # Interesting conundrum...if the function raised but a fixture context
+        # manager suppresses the exception exactly what should the return value
+        # be? I'm not exactly sure, so...
+        return ret  # type: ignore # todo semantics of error suppression
 
 
 @dataclass
