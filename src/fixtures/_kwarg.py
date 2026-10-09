@@ -7,7 +7,7 @@ the decorator as well as passed to the call.
 TODO - example
 """
 
-# TODO - disable all static type check ignores and document exactly whena and
+# TODO - disable all static type check ignores and document exactly when and
 #        why they occur, what would be needed to add proper types. The concern
 #        with an untypable library is it encourages global or module type
 #        ignores which can then hide other ignores. Understanding exactly why
