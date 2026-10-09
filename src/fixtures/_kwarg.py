@@ -26,8 +26,9 @@ TODO - example
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from functools import wraps
-from typing import Any, Callable, overload, ContextManager
+import inspect
 import traceback
+from typing import Any, Callable, overload, ContextManager, ClassVar
 
 __all__ = ("kwargs",)
 
@@ -140,6 +141,17 @@ class _Decorator[**Prhs, Rrhs]:
         @wraps(func)
         def _wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             return wrapper(*args, **kwargs)
+
+        # remove the injected keyword from the signature
+        signature = inspect.signature(_wrapper)
+        parameters = [
+            param
+            for name, param in signature.parameters.items()
+            if name != self.kwarg.name
+        ]
+        setattr(
+            _wrapper, "__signature__", signature.replace(parameters=parameters)
+        )
 
         return _wrapper
 

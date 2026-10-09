@@ -27,7 +27,8 @@ def kwarg_fixture(**_: Any) -> KwargFixture:
 
 @ kwargs["kwarg_fixture"] << kwarg_fixture()
 def test_pytest_and_kwargs(
-    pytest_fixture: PytestFixture, kwarg_fixture: KwargFixture | None = None
+    pytest_fixture: PytestFixture,
+    kwarg_fixture: KwargFixture,
 ) -> None:
     assert isinstance(pytest_fixture, PytestFixture)
     assert isinstance(kwarg_fixture, KwargFixture)
