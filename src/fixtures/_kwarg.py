@@ -54,7 +54,8 @@ class _PartialFactory[**P, R]:
         provided by the partial kwargs.
         """
         signature = inspect.signature(self.factory.factory)
-        for parameter in signature.parameters.values():
+        parameters = list(signature.parameters.values())[len(self.args) :]
+        for parameter in parameters:
             if (
                 parameter.kind != inspect.Parameter.VAR_KEYWORD
                 and parameter.name not in self.kwargs
